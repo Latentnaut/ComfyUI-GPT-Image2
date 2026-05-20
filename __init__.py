@@ -177,19 +177,21 @@ class GPTImage2Node(IO.ComfyNode):
                     mask_bytes_cache = m_buf.getvalue()
 
         # Ejecución
-        # When images are provided, process each image individually (1 API call per input image).
-        # This matches Gemini Fallback behavior: N inputs → N outputs.
-        # When no images, use 'n' to generate multiple images in a single call.
-        iterations = batch_count if image is not None else 1
+        # 'n' = batch count = desired number of output images. ALWAYS respected.
+        # Input images are CONTEXT only — their count must NOT affect the output count.
+        # Edit mode:  n iterations, 1 image per API response, all input images as context.
+        # Gen mode:   1 iteration,  n images per API response.
+        iterations = n if image is not None else 1
         n_param = 1 if image is not None else n
 
         async def _make_request(idx):
             files = None
             if image is not None:
                 files = []
-                # Send only the single image for this iteration index
-                img_bytes = image_bytes_cache[idx % len(image_bytes_cache)]
-                files.append(("image", (f"img_{idx}.png", BytesIO(img_bytes), "image/png")))
+                # Send ALL input images as context (they are reference, not batch drivers)
+                for j, img_bytes in enumerate(image_bytes_cache):
+                    field_name = "image" if batch_count == 1 else "image[]"
+                    files.append((field_name, (f"img_{j}.png", BytesIO(img_bytes), "image/png")))
                 if mask_bytes_cache is not None:
                     files.append(("mask", ("mask.png", BytesIO(mask_bytes_cache), "image/png")))
 
@@ -217,8 +219,10 @@ class GPTImage2Node(IO.ComfyNode):
             )
             
             tensor = await _validate_response_raw(raw_resp)
+            # Guard: take only 1 result per iteration — the API may return one per input image
+            tensor = tensor[:1]
             _, h_res, w_res, _ = tensor.shape
-            print(f"   🖼️  Received {tensor.shape[0]} image(s) at {w_res}x{h_res} from req [{idx+1}]")
+            print(f"   🖼️  Received image at {w_res}x{h_res} from req [{idx+1}]")
             return tensor
 
         try:
