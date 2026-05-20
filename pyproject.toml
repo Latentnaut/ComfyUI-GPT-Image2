@@ -1,0 +1,13 @@
+[project]
+name = "comfyui-gpt-image2"
+description = "GPT Image 2 node for ComfyUI with annotated size selector (aspect ratio + megapixels)."
+version = "1.0.0"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/user/ComfyUI-GPT-Image2"
+
+[tool.comfy]
+PublisherId = "local"
+DisplayName = "ComfyUI GPT Image 2"
+Icon = ""
