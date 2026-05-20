@@ -177,16 +177,19 @@ class GPTImage2Node(IO.ComfyNode):
                     mask_bytes_cache = m_buf.getvalue()
 
         # Ejecución
-        iterations = max(1, n // batch_count) if image is not None else 1
+        # When images are provided, process each image individually (1 API call per input image).
+        # This matches Gemini Fallback behavior: N inputs → N outputs.
+        # When no images, use 'n' to generate multiple images in a single call.
+        iterations = batch_count if image is not None else 1
         n_param = 1 if image is not None else n
 
         async def _make_request(idx):
             files = None
             if image is not None:
                 files = []
-                for j, img_bytes in enumerate(image_bytes_cache):
-                    field_name = "image" if batch_count == 1 else "image[]"
-                    files.append((field_name, (f"img_{j}.png", BytesIO(img_bytes), "image/png")))
+                # Send only the single image for this iteration index
+                img_bytes = image_bytes_cache[idx % len(image_bytes_cache)]
+                files.append(("image", (f"img_{idx}.png", BytesIO(img_bytes), "image/png")))
                 if mask_bytes_cache is not None:
                     files.append(("mask", ("mask.png", BytesIO(mask_bytes_cache), "image/png")))
 
